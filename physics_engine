@@ -1,0 +1,143 @@
+// Creature Physics Engine in Rust
+// Author: Cooter McGrew
+
+// This module handles the physics interactions between creatures and their environment.
+// It simulates movement, collisions, and interactions with terrain.
+
+use std::fmt;
+
+// Define a structure for 2D vector math.
+#[derive(Clone, Copy)]
+struct Vector2 {
+    x: f32,
+    y: f32,
+}
+
+impl Vector2 {
+    // Create a new vector.
+    fn new(x: f32, y: f32) -> Self {
+        Self { x, y }
+    }
+
+    // Add two vectors.
+    fn add(&self, other: &Self) -> Self {
+        Self {
+            x: self.x + other.x,
+            y: self.y + other.y,
+        }
+    }
+
+    // Scale a vector by a scalar value.
+    fn scale(&self, scalar: f32) -> Self {
+        Self {
+            x: self.x * scalar,
+            y: self.y * scalar,
+        }
+    }
+}
+
+impl fmt::Display for Vector2 {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "({:.2}, {:.2})", self.x, self.y)
+    }
+}
+
+// Define the structure for a creature.
+#[derive(Clone)]
+struct Creature {
+    position: Vector2, // Current position of the creature.
+    velocity: Vector2, // Velocity of the creature.
+    size: f32,         // Size (radius) of the creature.
+    energy: f32,       // Remaining energy, used for movement and interactions.
+}
+
+impl Creature {
+    // Create a new creature.
+    fn new(position: Vector2, size: f32, energy: f32) -> Self {
+        Self {
+            position,
+            velocity: Vector2::new(0.0, 0.0),
+            size,
+            energy,
+        }
+    }
+
+    // Apply a force to the creature, changing its velocity.
+    fn apply_force(&mut self, force: Vector2) {
+        self.velocity = self.velocity.add(&force);
+    }
+
+    // Update the creature's position based on its velocity.
+    fn update_position(&mut self, dt: f32) {
+        if self.energy > 0.0 {
+            self.position = self.position.add(&self.velocity.scale(dt));
+            self.energy -= self.velocity.scale(dt).x.abs() + self.velocity.scale(dt).y.abs();
+        }
+    }
+
+    // Check for collision with another creature.
+    fn check_collision(&self, other: &Self) -> bool {
+        let distance = ((self.position.x - other.position.x).powi(2)
+            + (self.position.y - other.position.y).powi(2))
+        .sqrt();
+        distance < (self.size + other.size)
+    }
+
+    // Handle collision by transferring energy and rebounding.
+    fn handle_collision(&mut self, other: &mut Self) {
+        if self.check_collision(other) {
+            let energy_transfer = 0.1 * self.energy.min(other.energy);
+            self.energy -= energy_transfer;
+            other.energy += energy_transfer;
+
+            // Simple rebound: reverse velocities.
+            self.velocity = self.velocity.scale(-1.0);
+            other.velocity = other.velocity.scale(-1.0);
+        }
+    }
+}
+
+impl fmt::Display for Creature {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Creature at {} with Velocity {} | Size: {:.2}, Energy: {:.2}",
+            self.position, self.velocity, self.size, self.energy
+        )
+    }
+}
+
+fn main() {
+    // Simulation parameters.
+    let dt = 0.1; // Time step.
+
+    // Create creatures in the world.
+    let mut creature1 = Creature::new(Vector2::new(1.0, 1.0), 0.5, 100.0);
+    let mut creature2 = Creature::new(Vector2::new(2.0, 1.5), 0.5, 80.0);
+
+    // Apply forces to creatures.
+    creature1.apply_force(Vector2::new(1.0, 0.0));
+    creature2.apply_force(Vector2::new(-0.5, 0.0));
+
+    println!("Initial State:");
+    println!("{}", creature1);
+    println!("{}\n", creature2);
+
+    // Run the simulation for 10 steps.
+    for step in 1..=10 {
+        println!("Step {}:", step);
+
+        // Update positions.
+        creature1.update_position(dt);
+        creature2.update_position(dt);
+
+        // Check and handle collisions.
+        creature1.handle_collision(&mut creature2);
+
+        // Print current state.
+        println!("{}", creature1);
+        println!("{}\n", creature2);
+    }
+
+    println!("Simulation complete!");
+}
