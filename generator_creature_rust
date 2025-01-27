@@ -1,0 +1,104 @@
+// Creature Generator in Rust
+// Author: Cooter McGrew
+
+// This project generates virtual creatures with attributes controlled by 'genes.'
+// These attributes can evolve over time using genetic algorithms.
+
+use rand::Rng; // For random number generation.
+use std::fmt;  // For displaying creature information.
+
+// Define a structure to represent a creature.
+#[derive(Clone)] // Clone trait allows duplication, which is important for genetic algorithms.
+struct Creature {
+    genes: Vec<f32>, // Genes control attributes like size, speed, and energy.
+    size: f32,       // Derived from gene expression.
+    speed: f32,      // Derived from gene expression.
+    energy: f32,     // Derived from gene expression.
+}
+
+impl Creature {
+    // Function to create a new creature with random genes.
+    fn new(num_genes: usize) -> Self {
+        let mut rng = rand::thread_rng();
+        let genes = (0..num_genes).map(|_| rng.gen_range(0.0..1.0)).collect();
+
+        // Instantiate and derive attributes from the genes.
+        let mut creature = Self {
+            genes,
+            size: 0.0,
+            speed: 0.0,
+            energy: 0.0,
+        };
+        creature.express_genes(); // Calculate derived attributes.
+        creature
+    }
+
+    // Function to derive attributes from genes.
+    fn express_genes(&mut self) {
+        // Example gene expression logic:
+        self.size = self.genes[0] * 10.0;      // Size depends on the first gene.
+        self.speed = self.genes[1] * 20.0;     // Speed depends on the second gene.
+        self.energy = (self.genes[2] * 100.0) - (self.size * self.speed * 0.1); // Energy is more complex.
+    }
+
+    // Function to mutate the creature's genes.
+    fn mutate(&mut self, mutation_rate: f32) {
+        let mut rng = rand::thread_rng();
+        for gene in &mut self.genes {
+            if rng.gen_bool(mutation_rate as f64) {
+                *gene = rng.gen_range(0.0..1.0); // Randomly mutate the gene.
+            }
+        }
+        self.express_genes(); // Recalculate attributes after mutation.
+    }
+}
+
+impl fmt::Display for Creature {
+    // Display the creature's attributes.
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Creature: [Size: {:.2}, Speed: {:.2}, Energy: {:.2}]",
+            self.size, self.speed, self.energy
+        )
+    }
+}
+
+fn main() {
+    // STEP 1: Create a population of creatures.
+    let population_size = 10;
+    let num_genes = 3; // Number of genes per creature.
+    let mutation_rate = 0.1; // Probability of gene mutation.
+
+    let mut population: Vec<Creature> = (0..population_size)
+        .map(|_| Creature::new(num_genes))
+        .collect();
+
+    // STEP 2: Display the initial population.
+    println!("Initial Population:");
+    for creature in &population {
+        println!("{}", creature);
+    }
+
+    // STEP 3: Mutate the population.
+    for creature in &mut population {
+        creature.mutate(mutation_rate);
+    }
+
+    // STEP 4: Display the mutated population.
+    println!("\nMutated Population:");
+    for creature in &population {
+        println!("{}", creature);
+    }
+
+    // Future Steps:
+    // - Add fitness evaluation to select the best creatures.
+    // - Implement crossover for genetic combination.
+    // - Add visualization of the population.
+
+    println!("\nCreature generation complete!");
+}
+
+// NOTE: Make sure to include the `rand` crate in your Cargo.toml dependencies:
+// [dependencies]
+// rand = "0.8"
