@@ -1,0 +1,156 @@
+// Genetic Algorithm Suite in Rust
+// Author: Cooter McGrew
+
+// This module provides a full suite of genetic algorithm utilities, including
+// fitness evaluation, selection, crossover, and mutation.
+
+use rand::seq::SliceRandom; // For random selection.
+use rand::Rng;              // For random number generation.
+
+// Define a structure to represent an individual in the population.
+#[derive(Clone)]
+struct Individual {
+    genes: Vec<f32>, // Genetic makeup of the individual.
+    fitness: f32,    // Fitness score derived from the genes.
+}
+
+impl Individual {
+    // Create a new random individual.
+    fn new(num_genes: usize) -> Self {
+        let mut rng = rand::thread_rng();
+        let genes = (0..num_genes).map(|_| rng.gen_range(0.0..1.0)).collect();
+        Self { genes, fitness: 0.0 }
+    }
+
+    // Evaluate the fitness of the individual.
+    fn evaluate_fitness(&mut self, fitness_fn: &dyn Fn(&Vec<f32>) -> f32) {
+        self.fitness = fitness_fn(&self.genes);
+    }
+
+    // Perform mutation on the individual's genes.
+    fn mutate(&mut self, mutation_rate: f32) {
+        let mut rng = rand::thread_rng();
+        for gene in &mut self.genes {
+            if rng.gen_bool(mutation_rate as f64) {
+                *gene = rng.gen_range(0.0..1.0);
+            }
+        }
+    }
+}
+
+// Genetic Algorithm implementation.
+struct GeneticAlgorithm {
+    population: Vec<Individual>,
+    fitness_fn: Box<dyn Fn(&Vec<f32>) -> f32>, // Fitness function provided by the user.
+    mutation_rate: f32,
+    crossover_rate: f32,
+}
+
+impl GeneticAlgorithm {
+    // Create a new genetic algorithm instance.
+    fn new(
+        population_size: usize,
+        num_genes: usize,
+        fitness_fn: Box<dyn Fn(&Vec<f32>) -> f32>,
+        mutation_rate: f32,
+        crossover_rate: f32,
+    ) -> Self {
+        let population = (0..population_size)
+            .map(|_| Individual::new(num_genes))
+            .collect();
+
+        Self {
+            population,
+            fitness_fn,
+            mutation_rate,
+            crossover_rate,
+        }
+    }
+
+    // Evaluate the fitness of the entire population.
+    fn evaluate_population(&mut self) {
+        for individual in &mut self.population {
+            individual.evaluate_fitness(&self.fitness_fn);
+        }
+        self.population.sort_by(|a, b| b.fitness.partial_cmp(&a.fitness).unwrap());
+    }
+
+    // Select parents using roulette wheel selection.
+    fn select_parents(&self) -> (&Individual, &Individual) {
+        let mut rng = rand::thread_rng();
+        let total_fitness: f32 = self.population.iter().map(|ind| ind.fitness).sum();
+
+        let select = |fitness_sum: f32| {
+            let mut sum = 0.0;
+            let target = rng.gen_range(0.0..fitness_sum);
+            self.population
+                .iter()
+                .find(|ind| {
+                    sum += ind.fitness;
+                    sum >= target
+                })
+                .unwrap()
+        };
+
+        (select(total_fitness), select(total_fitness))
+    }
+
+    // Perform crossover to produce offspring.
+    fn crossover(&self, parent1: &Individual, parent2: &Individual) -> Individual {
+        let mut rng = rand::thread_rng();
+        let genes: Vec<f32> = parent1
+            .genes
+            .iter()
+            .zip(&parent2.genes)
+            .map(|(&g1, &g2)| if rng.gen_bool(self.crossover_rate as f64) { g2 } else { g1 })
+            .collect();
+
+        Individual { genes, fitness: 0.0 }
+    }
+
+    // Create the next generation.
+    fn next_generation(&mut self) {
+        let mut new_population = Vec::new();
+
+        while new_population.len() < self.population.len() {
+            let (parent1, parent2) = self.select_parents();
+            let mut offspring = self.crossover(parent1, parent2);
+            offspring.mutate(self.mutation_rate);
+            new_population.push(offspring);
+        }
+
+        self.population = new_population;
+    }
+}
+
+fn main() {
+    // Define a simple fitness function (maximize the sum of genes).
+    let fitness_fn = |genes: &Vec<f32>| genes.iter().sum();
+
+    // Parameters for the genetic algorithm.
+    let population_size = 20;
+    let num_genes = 5;
+    let mutation_rate = 0.1;
+    let crossover_rate = 0.7;
+
+    // Create the genetic algorithm instance.
+    let mut ga = GeneticAlgorithm::new(
+        population_size,
+        num_genes,
+        Box::new(fitness_fn),
+        mutation_rate,
+        crossover_rate,
+    );
+
+    // Run the genetic algorithm for multiple generations.
+    for generation in 1..=10 {
+        println!("Generation {}:", generation);
+
+        ga.evaluate_population();
+        for (i, individual) in ga.population.iter().enumerate() {
+            println!("{}: Fitness: {:.2}, Genes: {:?}", i + 1, individual.fitness, individual.genes);
+        }
+
+        ga.next_generation();
+    }
+}
